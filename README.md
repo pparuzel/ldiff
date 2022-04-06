@@ -23,8 +23,8 @@ options:
 ### File-to-file comparison
 ```bash
 $ ldiff file1 file2
-Levenshtein comparison of ./file1 (S=5345)
-./file2: 100.00% similar. D=0, S=5345
+Levenshtein comparison of file1 (S=5345)
+file2: 100.00% similar. D=0, S=5345
 ```
 
 ### File-to-directory comparison
