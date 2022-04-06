@@ -72,6 +72,8 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except UnicodeDecodeError as e:
+        print('error: specified file is not text-readable')
     except OSError as e:
         print(e)
         sys.exit(1)
