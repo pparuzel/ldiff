@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import argparse
+try:
+    import Levenshtein
+except ModuleNotFoundError:
+    print('error: Levenshtein module is missing')
+    print('       Please, install using this command:')
+    print()
+    print('       env python3 -m pip install Levenshtein')
+    sys.exit(255)
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('file', help='File to compare with')
+    parser.add_argument('comparisons', nargs='+', help='Files or directories to compare')
+    parser.add_argument('-r', '--recursive', action='store_true', help='Recursively compare files of unspecified subdirectories')
+    parser.add_argument('-d', '--different', action='store_true', help='Show percentage of difference rather than similarity')
+    parser.add_argument('-t', '--threshold', metavar='P', type=int, default=None, help='Filter results of equal or higher percentage threshold')
+    return parser.parse_args()
+
+
+class SimilarityMeasure:
+    def __init__(self, content, similarity_mode: bool = True, threshold: int = None):
+        self.content = content
+        self.similarity_mode = similarity_mode
+        self.threshold_check = lambda k: k >= threshold if threshold is not None else lambda k: k
+        self.diff_word = 'similar' if similarity_mode else 'different'
+
+    def compare_with_file(self, content, comparison_file):
+        with open(comparison_file, 'r') as comparison_handle:
+            try:
+                comparison_content = comparison_handle.read()
+            except UnicodeDecodeError:
+                print(f'{comparison_handle.name} is a binary file, skipping...')
+                return
+            lengths = _, comparison_len = len(content), len(comparison_content)
+            levendist = Levenshtein.distance(content, comparison_content)
+            levendist_normalized = levendist / (max(*lengths))
+            if self.similarity_mode:
+                levendist_normalized = 1 - levendist_normalized
+            if self.threshold_check(levendist_normalized * 100):
+                print(f'{comparison_handle.name}: {levendist_normalized * 100:.2f}% {self.diff_word}. D={levendist}, S={comparison_len}')
+
+    def compare_with_directory(self, content, comparison_directory, recursive=False):
+        for filename in os.listdir(comparison_directory):
+            if os.path.isdir(os.path.join(comparison_directory, filename)):
+                if recursive:
+                    self.compare_with_directory(content, os.path.join(comparison_directory, filename), recursive=recursive)
+                else:
+                    print(f'{filename} is a directory, skipping...')
+            else:
+                self.compare_with_file(content, os.path.join(comparison_directory, filename))
+
+
+def main():
+    args = parse_arguments()
+    with open(args.file, 'r') as f:
+        file_content = f.read()
+        print(f'Levenshtein comparison of {args.file} (S={len(file_content)})')
+        similarity = SimilarityMeasure(file_content, similarity_mode = not args.different, threshold = args.threshold)
+        for comparison in args.comparisons:
+            if os.path.isdir(comparison):
+                similarity.compare_with_directory(file_content, comparison, recursive=args.recursive)
+            else:
+                similarity.compare_with_file(file_content, comparison)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except OSError as e:
+        print(e)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print('\n\nGoodbye!')
+        sys.exit(2)
